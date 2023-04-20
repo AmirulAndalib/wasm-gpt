@@ -21,7 +21,7 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200, "OK")
         self.end_headers()
 
-serve_directory = 'bin'
+serve_directory = 'build/bin'
 
 HandlerClass = partial(CORSRequestHandler, directory=serve_directory)
 httpd = http.server.HTTPServer(('0.0.0.0', 8443), HandlerClass)

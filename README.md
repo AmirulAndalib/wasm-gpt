@@ -1,3 +1,20 @@
+# ggml-wasm-demo
+
+1. Have emscripten installed and activated
+
+2.
+
+```
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
+-subj "/CN=localhost" -addext "subjectAltName = DNS:localhost"
+mkdir build
+cd build
+emcmake cmake ..
+make gpt-2
+
+cd .. && python server.py
+```
+
 # ggml
 
 Tensor library for machine learning
