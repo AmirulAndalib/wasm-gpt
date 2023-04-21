@@ -17,7 +17,7 @@ This demo uses a [Cerebras-GPT-1.3B-Alpaca-SP](https://huggingface.co/lxe/Cerebr
 ### TODOs
 
  - [ ] Less unhinged model support
- - [ ] Repetition penalty
+ - [X] Repetition penalty
  - [ ] Longer context
 
 ### How to run locally
