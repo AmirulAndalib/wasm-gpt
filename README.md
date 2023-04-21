@@ -12,6 +12,13 @@ This demo uses a [Cerebras-GPT-1.3B-Alpaca-SP](https://huggingface.co/lxe/Cerebr
  - I limited initial system prompt and removed memory/context for speed.
  - The model is around 900MB and takes a while to load. 
  - Doesn't work on mobile safari. Probably won't work in all browsers.
+ - ggml's implementation of gpt2 doesn't have repetition penalty (TODO), making it very repetitive
+ 
+### TODOs
+
+ - [] Less unhinged model support
+ - [] Repetition penalty
+ - [] Longer context
 
 ### How to run locally
 
