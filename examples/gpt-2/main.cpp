@@ -13,6 +13,11 @@
 #include <iostream>
 #include <unistd.h>
 
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/threading.h>
+#include <functional>
+
 // default hparams (GPT-2 117M)
 struct gpt2_hparams {
     int32_t n_vocab = 50257;
@@ -708,69 +713,40 @@ bool gpt2_eval(
     return true;
 }
 
-int main(int argc, char ** argv) {
-    const int64_t t_main_start_us = ggml_time_us();
+gpt_params params;
+gpt_vocab vocab;
+gpt2_model model;
 
-    gpt_params params;
-    params.model = "models/gpt-2-117M/ggml-model.bin";
+struct ThreadArgs {
+    std::string prompt;
+};
 
-    if (gpt_params_parse(argc, argv, params) == false) {
-        return 1;
-    }
-
-    if (params.seed < 0) {
-        params.seed = time(NULL);
-    }
-
-    printf("%s: seed = %d\n", __func__, params.seed);
-
-    std::mt19937 rng(params.seed);
-    if (params.prompt.empty()) {
-        if( !isatty(STDIN_FILENO) ){
-            std::string line;
-            while( std::getline(std::cin, line) ){
-                params.prompt = params.prompt + "\n" + line;
-            }
-        } else {
-            params.prompt = gpt_random_prompt(rng);
-        }
-    }
-
-    int64_t t_load_us = 0;
-
-    gpt_vocab vocab;
-    gpt2_model model;
-
-    // load the model
-    {
-        const int64_t t_start_us = ggml_time_us();
-
-        if (!gpt2_model_load(params.model, model, vocab)) {
-            fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
-            return 1;
-        }
-
-        t_load_us = ggml_time_us() - t_start_us;
-    }
+void* threaded_generate(void* arg) {
+    ThreadArgs* thread_args = static_cast<ThreadArgs*>(arg);
+    std::string prompt = thread_args->prompt;
 
     int n_past = 0;
 
     int64_t t_sample_us  = 0;
     int64_t t_predict_us = 0;
 
+    std::mt19937 rng(params.seed);
     std::vector<float> logits;
+
+    // params.prompt = "Human:" + prompt + "\nAssistant:";
+    params.prompt = prompt;
 
     // tokenize the prompt
     std::vector<gpt_vocab::id> embd_inp = ::gpt_tokenize(vocab, params.prompt);
 
     params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
 
-    printf("%s: prompt: '%s'\n", __func__, params.prompt.c_str());
-    printf("%s: number of tokens in prompt = %zu, first 8 tokens: ", __func__, embd_inp.size());
-    for (int i = 0; i < std::min(8, (int) embd_inp.size()); i++) {
-        printf("%d ", embd_inp[i]);
-    }
-    printf("\n\n");
+    // printf("%s: prompt: '%s'\n", __func__, params.prompt.c_str());
+    // printf("%s: number of tokens in prompt = %zu, first 8 tokens: ", __func__, embd_inp.size());
+    // for (int i = 0; i < std::min(8, (int) embd_inp.size()); i++) {
+    //     printf("%d ", embd_inp[i]);
+    // }
+    // printf("\n\n");
 
     // submit the input prompt token-by-token
     // this reduces the memory usage during inference, at the cost of a bit of speed at the beginning
@@ -787,7 +763,7 @@ int main(int argc, char ** argv) {
 
             if (!gpt2_eval(model, params.n_threads, n_past, embd, logits, mem_per_token)) {
                 printf("Failed to predict\n");
-                return 1;
+                return nullptr;
             }
 
             t_predict_us += ggml_time_us() - t_start_us;
@@ -829,9 +805,14 @@ int main(int argc, char ** argv) {
 
         // display text
         for (auto id : embd) {
-            printf("%s", vocab.id_to_token[id].c_str());
+            auto word = vocab.id_to_token[id].c_str();
+            MAIN_THREAD_EM_ASM({
+                const resultPtr = $0;
+                const result = UTF8ToString(resultPtr);
+
+                Module.callback(result)
+            }, word);
         }
-        fflush(stdout);
 
         // end of text token
         if (embd.back() == 50256) {
@@ -839,19 +820,75 @@ int main(int argc, char ** argv) {
         }
     }
 
-    // report timing
-    {
-        const int64_t t_main_end_us = ggml_time_us();
+   // report timing
+   {
+       const int64_t t_main_end_us = ggml_time_us();
+       printf("\n\n");
+       printf("%s: mem per token = %8zu bytes\n", __func__, mem_per_token);
+       printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
+       printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us/1000.0f, t_predict_us/1000.0f/n_past);
+   }
 
-        printf("\n\n");
-        printf("%s: mem per token = %8zu bytes\n", __func__, mem_per_token);
-        printf("%s:     load time = %8.2f ms\n", __func__, t_load_us/1000.0f);
-        printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
-        printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us/1000.0f, t_predict_us/1000.0f/n_past);
-        printf("%s:    total time = %8.2f ms\n", __func__, (t_main_end_us - t_main_start_us)/1000.0f);
+    delete thread_args;
+    return nullptr;
+}
+
+extern "C" {
+    EMSCRIPTEN_KEEPALIVE
+    int init () {
+        params.model = "models/Cerebras-GPT-1.3B-Alpaca-SP/ggml-model.bin";
+        params.seed = time(NULL);
+
+        printf("%s: seed = %d\n", __func__, params.seed);
+
+        params.prompt = "Human: How is cheese made?\nAssistant:";
+
+        int64_t t_load_us = 0;
+
+        // load the model
+        {
+            const int64_t t_start_us = ggml_time_us();
+
+            if (!gpt2_model_load(params.model, model, vocab)) {
+                fprintf(stderr, "%s: failed to load model from '%s'\n", __func__, params.model.c_str());
+                return 1;
+            }
+
+            t_load_us = ggml_time_us() - t_start_us;
+        }
+
+        printf("%s: params.n_threads = %d\n", __func__, params.n_threads);
+
+        return 0;
     }
 
-    ggml_free(model.ctx);
+    EMSCRIPTEN_KEEPALIVE
+    int generate(const std::string& prompt) {
+        pthread_t thread;
+        ThreadArgs* thread_args = new ThreadArgs{prompt};
 
+        if (pthread_create(&thread, nullptr, threaded_generate, thread_args) != 0) {
+            return -1;
+        }
+
+        pthread_detach(thread);
+
+        return 0;
+    }
+
+}
+
+EMSCRIPTEN_BINDINGS(my_module) {
+    emscripten::function("generate", &generate);
+    emscripten::function("init", &init);
+}
+
+void loop() {
+    emscripten_sleep(20);
+}
+
+int main(int argc, char ** argv) {
+    emscripten_set_main_loop(loop, 0, 1);
+    // ggml_free(model.ctx);
     return 0;
 }

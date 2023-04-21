@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>WasmGPT</title>
+
+    <style>
+        html {
+            box-sizing: border-box;
+        }
+
+        *,
+        *:before,
+        *:after {
+            box-sizing: inherit;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: monospace;
+            font-size: 16px;
+            margin: 0;
+            padding: 0;
+        }
+
+        #wrap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            flex-direction: column;
+            padding: 0;
+        }
+
+        #wrap>* {
+            padding: 10px;
+        }
+
+        #stdout {
+            white-space: pre-wrap;
+            height: 200px;
+            overflow-y: auto;
+  
+        }
+
+        #stdout-wrapper {
+            color: #eee;
+            background-color: #333;
+        }
+
+        #chat {
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            gap: 5px;
+        }
+
+        #chat input, #chat button {    
+            padding: 3px 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="wrap">
+        <code id="chat-wrapper"><pre style="white-space: pre-wrap;" id="output"></pre></code>
+
+    
+        <div style="flex:1"></div>
+
+        <form id="chat" style="display: none;">
+            <input style="flex: 1" type="text" id="inputPrompt" placeholder="Ask a Question" />
+            <button style="max-width: 100px;"><img alt="" style="height:32px" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pg0KPCEtLSBVcGxvYWRlZCB0bzogU1ZHIFJlcG8sIHd3dy5zdmdyZXBvLmNvbSwgR2VuZXJhdG9yOiBTVkcgUmVwbyBNaXhlciBUb29scyAtLT4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8c3ZnIGZpbGw9IiMwMDAwMDAiIGhlaWdodD0iODAwcHgiIHdpZHRoPSI4MDBweCIgdmVyc2lvbj0iMS4xIiBpZD0iQ2FwYV8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiANCgkgdmlld0JveD0iMCAwIDQ5NS4wMDMgNDk1LjAwMyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8ZyBpZD0iWE1MSURfNTFfIj4NCgk8cGF0aCBpZD0iWE1MSURfNTNfIiBkPSJNMTY0LjcxMSw0NTYuNjg3YzAsMi45NjYsMS42NDcsNS42ODYsNC4yNjYsNy4wNzJjMi42MTcsMS4zODUsNS43OTksMS4yMDcsOC4yNDUtMC40NjhsNTUuMDktMzcuNjE2DQoJCWwtNjcuNi0zMi4yMlY0NTYuNjg3eiIvPg0KCTxwYXRoIGlkPSJYTUxJRF81Ml8iIGQ9Ik00OTIuNDMxLDMyLjQ0M2MtMS41MTMtMS4zOTUtMy40NjYtMi4xMjUtNS40NC0yLjEyNWMtMS4xOSwwLTIuMzc3LDAuMjY0LTMuNSwwLjgxNkw3LjkwNSwyNjQuNDIyDQoJCWMtNC44NjEsMi4zODktNy45MzcsNy4zNTMtNy45MDQsMTIuNzgzYzAuMDMzLDUuNDIzLDMuMTYxLDEwLjM1Myw4LjA1NywxMi42ODlsMTI1LjM0Miw1OS43MjRsMjUwLjYyLTIwNS45OUwxNjQuNDU1LDM2NC40MTQNCgkJbDE1Ni4xNDUsNzQuNGMxLjkxOCwwLjkxOSw0LjAxMiwxLjM3Niw2LjA4NCwxLjM3NmMxLjc2OCwwLDMuNTE5LTAuMzIyLDUuMTg2LTAuOTc3YzMuNjM3LTEuNDM4LDYuNTI3LTQuMzE4LDcuOTctNy45NTYNCgkJTDQ5NC40MzYsNDEuMjU3QzQ5NS42NiwzOC4xODgsNDk0Ljg2MiwzNC42NzksNDkyLjQzMSwzMi40NDN6Ii8+DQo8L2c+DQo8L3N2Zz4=" /></button>
+        </form>
+
+        <code id="stdout-wrapper"><pre id="stdout" >Initializing...</pre></code>
+    </div>
+
+    <script type='text/javascript'>
+        const $stdout = document.getElementById('stdout');
+
+        $stdout.addEventListener('DOMNodeInserted', () => {
+            $stdout.scrollTop = $stdout.scrollHeight;
+        });
+
+        const $output = document.getElementById("output")
+
+        $output.addEventListener('DOMNodeInserted', () => {
+            $output.scrollTop = $output.scrollHeight;
+        });
+
+        function print(text) {
+            $stdout.innerHTML += text + "<br>";
+        }
+
+        let isGenerating = false;
+        runawayGenerateTimer = null;
+
+        var Module = {
+            'print': print,
+            'printErr': print,
+
+            callback: function (resultStr) {
+                console.log(resultStr);
+                if (resultStr === '<|endoftext|>') {
+                    $output.innerHTML += '\n'
+                    $input.diabled = false;
+                    isGenerating = false;
+                } else {
+                    const text = $output.innerHTML + resultStr;
+                    $output.innerHTML = text
+                        .replace(/(Human|Assistant):(\S)/g, '$1: $2')
+
+
+                    if (runawayGenerateTimer) clearTimeout(runawayGenerateTimer)
+                    runawayGenerateTimer = setTimeout(function () {
+                        $input.diabled = false;
+                        isGenerating = false;
+                    }, 10000);
+                }
+            },
+
+            onRuntimeInitialized: function () {
+                Module.init();
+
+                $chat = document.getElementById("chat");
+                $chat.style.display = "flex";
+
+                $input = document.getElementById("inputPrompt");
+
+                $chat.addEventListener("submit", function (e) {
+                    e.preventDefault();
+
+                    if (isGenerating) return false;
+
+                    const inputPrompt = $input.value;
+                    $input.value = "";
+
+                    const prompt = '' + 
+                        // 'A conversation between a human and an intelligent and helpful AI assistant:\n\n' + 
+                        // 'Human: What is the capital of France?\n' + 
+                        // 'Assistant: The capital of France is Paris.\n\n' +
+                        // 'Human: How many people live in Paris?\n' +
+                        // 'Assistant: About 2.2 million people live in Paris.\n\n' + $input.innerText + '\n' + 
+                        'Human:' + inputPrompt + '\nAssistant:';
+
+                    console.log(prompt)
+                        
+                    Module.generate(prompt);
+                    isGenerating = true;
+                    $input.diabled = true;
+
+                    return false;
+                });
+            },
+        };
+
+    </script>
+
+    <!-- Add the javascript glue code (index.js) as generated by Emscripten -->
+    <!-- <script async src="gpt-2.js"></script> -->
+    <!-- {{{ SCRIPT }}} -->
+
+    {{{ SCRIPT }}}
+
+</body>
+
+</html>
+
+
