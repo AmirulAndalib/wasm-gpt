@@ -719,11 +719,19 @@ gpt2_model model;
 
 struct ThreadArgs {
     std::string prompt;
+    int top_k;
+    float top_p;
+    float temp;
+    float repeat_penalty;
 };
 
 void* threaded_generate(void* arg) {
     ThreadArgs* thread_args = static_cast<ThreadArgs*>(arg);
     std::string prompt = thread_args->prompt;
+    int top_k = thread_args->top_k;
+    float top_p = thread_args->top_p;
+    float temp = thread_args->temp;
+    float repeat_penalty = thread_args->repeat_penalty;
 
     int n_past = 0;
 
@@ -774,9 +782,9 @@ void* threaded_generate(void* arg) {
 
         if (i >= embd_inp.size()) {
             // sample next token
-            const int   top_k = params.top_k;
-            const float top_p = params.top_p;
-            const float temp  = params.temp;
+            // const int   top_k = params.top_k;
+            // const float top_p = params.top_p;
+            // const float temp  = params.temp;
 
             const int n_vocab = model.hparams.n_vocab;
 
@@ -785,7 +793,7 @@ void* threaded_generate(void* arg) {
             {
                 const int64_t t_start_sample_us = ggml_time_us();
 
-                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, temp, rng);
+                id = gpt_sample_top_k_top_p(vocab, logits.data() + (logits.size() - n_vocab), top_k, top_p, repeat_penalty, temp, rng);
 
                 t_sample_us += ggml_time_us() - t_start_sample_us;
             }
@@ -820,14 +828,18 @@ void* threaded_generate(void* arg) {
         }
     }
 
-   // report timing
-   {
-       const int64_t t_main_end_us = ggml_time_us();
-       printf("\n\n");
-       printf("%s: mem per token = %8zu bytes\n", __func__, mem_per_token);
-       printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
-       printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us/1000.0f, t_predict_us/1000.0f/n_past);
-   }
+    MAIN_THREAD_EM_ASM({
+        Module.callback('<|endoftext|>')
+    });
+
+    // report timing
+    {
+        const int64_t t_main_end_us = ggml_time_us();
+        printf("\n\n");
+        printf("%s: mem per token = %8zu bytes\n", __func__, mem_per_token);
+        printf("%s:   sample time = %8.2f ms\n", __func__, t_sample_us/1000.0f);
+        printf("%s:  predict time = %8.2f ms / %.2f ms per token\n", __func__, t_predict_us/1000.0f, t_predict_us/1000.0f/n_past);
+    }
 
     delete thread_args;
     return nullptr;
@@ -863,9 +875,9 @@ extern "C" {
     }
 
     EMSCRIPTEN_KEEPALIVE
-    int generate(const std::string& prompt) {
+    int generate(const std::string& prompt, const int top_k, const float top_p, const float temp, const float repeat_penalty) {
         pthread_t thread;
-        ThreadArgs* thread_args = new ThreadArgs{prompt};
+        ThreadArgs* thread_args = new ThreadArgs{prompt, top_k, top_p, temp, repeat_penalty};
 
         if (pthread_create(&thread, nullptr, threaded_generate, thread_args) != 0) {
             return -1;
