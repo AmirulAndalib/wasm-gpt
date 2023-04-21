@@ -272,16 +272,32 @@ gpt_vocab::id gpt_sample_top_k_top_p(
         int    top_k,
         double top_p,
         double temp,
+        double repetition_penalty,
         std::mt19937 & rng) {
+
     int n_logits = vocab.id_to_token.size();
 
     std::vector<std::pair<double, gpt_vocab::id>> logits_id;
     logits_id.reserve(n_logits);
 
+    // {
+    //     const double scale = 1.0f/temp;
+    //     for (int i = 0; i < n_logits; ++i) {
+    //         logits_id.push_back(std::make_pair(logits[i]*scale, i));
+    //     }
+    // }
+
     {
-        const double scale = 1.0/temp;
+        const float scale = 1.0f/temp;
         for (int i = 0; i < n_logits; ++i) {
-            logits_id.push_back(std::make_pair(logits[i]*scale, i));
+            // repetition penalty from ctrl paper (https://arxiv.org/abs/1909.05858)
+            // credit https://github.com/facebookresearch/llama/compare/main...shawwn:llama:main
+            // if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
+            if (logits[i] < 0.0f) {
+                logits_id.push_back(std::make_pair(logits[i]*scale*repetition_penalty, i));
+            } else {
+                logits_id.push_back(std::make_pair(logits[i]*scale/repetition_penalty, i));
+            }
         }
     }
 

@@ -21,8 +21,6 @@ if (DEFINED EMSCRIPTEN)
         -s INITIAL_MEMORY=3GB \
         -s NO_EXIT_RUNTIME=1 \
         -s ALLOW_TABLE_GROWTH=1 \
-        -s 'EXPORTED_RUNTIME_METHODS=[\"ccall\", \"cwrap\"]' \
-        -s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$addFunction \
         --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/models@models/"
     )
 endif (DEFINED EMSCRIPTEN)

@@ -17,7 +17,7 @@
 struct gpt_params {
     int32_t seed      = -1; // RNG seed
     int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
-    int32_t n_predict = 40; // new tokens to predict
+    int32_t n_predict = 120; // new tokens to predict
 
     // sampling parameters
     int32_t top_k = 40;
@@ -87,6 +87,7 @@ gpt_vocab::id gpt_sample_top_k_top_p(
         int    top_k,
         double top_p,
         double temp,
+        double repetition_penalty,
         std::mt19937 & rng);
 
 //
