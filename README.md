@@ -1,19 +1,49 @@
-# ggml-wasm-demo
+# WasmGPT
+
+ChatGPT-like chatbot in the browser using ggml and emscripten. No API keys required. No server required. No data is sent to any server.
+
+This demo uses a [Cerebras-GPT-1.3B-Alpaca-SP](https://huggingface.co/lxe/Cerebras-GPT-1.3B-Alpaca-SP), which is a version of the [Cerebras-GPT-1.3B](https://huggingface.co/cerebras/Cerebras-GPT-1.3B) model LoRA-finetuned on the [Alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca) dataset. 
+
+- [Demo](https://lxe.co/wasmgpt/)
+
+### Limitations
+
+ - The model is very hallucinatory and can generate very incorrect text. 
+ - I limited initial system prompt and removed memory/context for speed.
+ - The model is around 900MB and takes a while to load. 
+ - Doesn't work on mobile safari. Probably won't work in all browsers.
+
+### How to run locally
 
 1. Have emscripten installed and activated
 
-2.
+2. Clone this repo:
+
+```
+git clone -b wasm-demo https://github.com/lxe/ggml.git
+cd ggml
+```
+
+2. In order to make wasm work, you need to serve it over https and provide Cross-Origin-Embedder-Policy and Cross-Origin-Opener-Policy headers. You can use the following commands to generate a self-signed certificate.
 
 ```
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
 -subj "/CN=localhost" -addext "subjectAltName = DNS:localhost"
+```
+
+You will also need to add the certificate to your browser's root store.
+
+3. Build the software and run the server:
+
+```
 mkdir build
 cd build
 emcmake cmake ..
 make gpt-2
-
 cd .. && python server.py
 ```
+
+###
 
 # ggml
 

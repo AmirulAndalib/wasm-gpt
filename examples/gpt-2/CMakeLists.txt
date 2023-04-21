@@ -11,7 +11,7 @@ if (DEFINED EMSCRIPTEN)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --shell-file ${CMAKE_CURRENT_SOURCE_DIR}/index.html")
     set_target_properties(gpt-2 PROPERTIES 
       SUFFIX ".html" 
-      LINK_FLAGS "-pthread -g4 --bind \
+      LINK_FLAGS "-pthread -g4 --bind --use-preload-cache \
         -s MINIFY_HTML=0 \
         -s ASYNCIFY=1 \
         -s USE_PTHREADS=1 \
