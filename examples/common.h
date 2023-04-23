@@ -17,16 +17,16 @@
 struct gpt_params {
     int32_t seed      = -1; // RNG seed
     int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
-    int32_t n_predict = 200; // new tokens to predict
+    int32_t n_predict = 40; // new tokens to predict
 
     // sampling parameters
     int32_t top_k = 40;
-    float   top_p = 0.9f;
-    float   temp  = 0.9f;
+    float   top_p = 0.18f;
+    float   temp  = 0.1f;
 
     int32_t n_batch = 8; // batch size for prompt processing
 
-    std::string model = "models/gpt-2-117M/ggml-model.bin"; // model path
+    std::string model = "models/Cerebras-GPT-1.3B-Alpaca-SP/ggml-model.bin"; // model path
     std::string prompt;
 };
 
